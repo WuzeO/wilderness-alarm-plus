@@ -85,4 +85,12 @@ public interface WildernessAlarmPlusConfig extends Config
 		position = 9
 	)
 	default Color nonAttackableColor() { return new Color(0, 120, 255, 255); }
+
+	@ConfigItem(
+		keyName = "debugChat",
+		name = "Debug to chat",
+		description = "Print plugin version on startup and the players triggering each flash to game chat (use to verify the latest jar is loaded)",
+		position = 10
+	)
+	default boolean debugChat() { return false; }
 }

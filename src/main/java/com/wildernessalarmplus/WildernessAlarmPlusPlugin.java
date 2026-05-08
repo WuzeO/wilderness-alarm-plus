@@ -2,7 +2,10 @@ package com.wildernessalarmplus;
 
 import com.google.inject.Provides;
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 import javax.inject.Inject;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
@@ -12,6 +15,8 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @PluginDescriptor(
 	name = "Wilderness Alarm+",
@@ -20,6 +25,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class WildernessAlarmPlusPlugin extends Plugin
 {
+	private static final Logger log = LoggerFactory.getLogger(WildernessAlarmPlusPlugin.class);
+	private static final String VERSION = "1.0.5";
 	private static final int VARBIT_IN_WILDERNESS = 5963;
 
 	@Inject private Client client;
@@ -40,6 +47,29 @@ public class WildernessAlarmPlusPlugin extends Plugin
 	{
 		activeColor = null;
 		overlayManager.add(overlay);
+		log.info("[Wilderness Alarm+] v{} startUp; debugChat={}", VERSION, config.debugChat());
+		announceLoaded();
+	}
+
+	private void announceLoaded()
+	{
+		if (!config.debugChat())
+		{
+			return;
+		}
+		try
+		{
+			client.addChatMessage(
+				ChatMessageType.GAMEMESSAGE,
+				"",
+				"[Wilderness Alarm+] v" + VERSION + " loaded.",
+				""
+			);
+		}
+		catch (Throwable ignored)
+		{
+			// client may not be ready at startup; harmless
+		}
 	}
 
 	@Override
@@ -77,6 +107,8 @@ public class WildernessAlarmPlusPlugin extends Plugin
 
 		boolean sawAttackable = false;
 		boolean sawNonAttackable = false;
+		List<String> debugAttackable = config.debugChat() ? new ArrayList<>() : null;
+		List<String> debugNonAttackable = config.debugChat() ? new ArrayList<>() : null;
 
 		for (Player p : client.getTopLevelWorldView().players())
 		{
@@ -84,12 +116,14 @@ public class WildernessAlarmPlusPlugin extends Plugin
 			{
 				continue;
 			}
-			if (!isInWilderness(p.getWorldLocation()))
+			WorldPoint wp = p.getWorldLocation();
+			if (!isInWilderness(wp))
 			{
 				continue;
 			}
 			int cb = p.getCombatLevel();
-			if (cb >= low && cb <= high)
+			boolean inBracket = cb >= low && cb <= high;
+			if (inBracket)
 			{
 				sawAttackable = true;
 			}
@@ -97,7 +131,21 @@ public class WildernessAlarmPlusPlugin extends Plugin
 			{
 				sawNonAttackable = true;
 			}
-			if (sawAttackable && sawNonAttackable)
+			if (debugAttackable != null && wp != null)
+			{
+				String entry = (p.getName() == null ? "?" : p.getName())
+					+ " cb=" + cb + " @(" + wp.getX() + "," + wp.getY() + ")";
+				if (inBracket)
+				{
+					debugAttackable.add(entry);
+				}
+				else
+				{
+					debugNonAttackable.add(entry);
+				}
+			}
+			// no early break when debug enabled — we want a full list
+			if (debugAttackable == null && sawAttackable && sawNonAttackable)
 			{
 				break;
 			}
@@ -114,6 +162,21 @@ public class WildernessAlarmPlusPlugin extends Plugin
 		else
 		{
 			activeColor = null;
+		}
+
+		if (debugAttackable != null)
+		{
+			WorldPoint mwp = local.getWorldLocation();
+			String msg = "[WA+ v" + VERSION + "] me@(" + (mwp == null ? "?" : mwp.getX() + "," + mwp.getY())
+				+ ") wildy=" + wildyLevel
+				+ " bracket=" + low + ".." + high
+				+ " atk=" + debugAttackable
+				+ " non=" + debugNonAttackable;
+			log.info(msg);
+			if (!debugAttackable.isEmpty() || !debugNonAttackable.isEmpty())
+			{
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, "");
+			}
 		}
 	}
 
@@ -136,8 +199,21 @@ public class WildernessAlarmPlusPlugin extends Plugin
 
 	private static boolean isInWilderness(WorldPoint wp)
 	{
-		return computeWildernessLevel(wp) > 0;
+		if (computeWildernessLevel(wp) <= 0)
+		{
+			return false;
+		}
+		// Exclude known safe zones inside the wildy bounding box (e.g. Ferox Enclave).
+		return !SafeZones.isInSafeZone(wp);
 	}
+
+	// Wilderness rectangle bounds (surface and underground share X range; underground Y is offset by 6400)
+	private static final int WILDY_MIN_X = 2944;
+	private static final int WILDY_MAX_X = 3392;
+	private static final int WILDY_MIN_Y_SURFACE = 3523;
+	private static final int WILDY_MAX_Y_SURFACE = 3967;
+	private static final int WILDY_MIN_Y_CAVES = 9920;
+	private static final int WILDY_MAX_Y_CAVES = 10367;
 
 	private static int computeWildernessLevel(WorldPoint wp)
 	{
@@ -145,12 +221,17 @@ public class WildernessAlarmPlusPlugin extends Plugin
 		{
 			return 0;
 		}
+		int x = wp.getX();
 		int y = wp.getY();
-		if (y >= 9920)
+		if (x < WILDY_MIN_X || x > WILDY_MAX_X)
 		{
-			return ((y - 9920) / 8) + 1;
+			return 0;
 		}
-		if (y >= 3523)
+		if (y >= WILDY_MIN_Y_CAVES && y <= WILDY_MAX_Y_CAVES)
+		{
+			return ((y - WILDY_MIN_Y_CAVES) / 8) + 1;
+		}
+		if (y >= WILDY_MIN_Y_SURFACE && y <= WILDY_MAX_Y_SURFACE)
 		{
 			return ((y - 3520) / 8) + 1;
 		}
