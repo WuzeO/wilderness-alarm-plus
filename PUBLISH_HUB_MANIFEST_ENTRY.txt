@@ -1,0 +1,15 @@
+### Plugin-hub manifest entry
+###
+### After your wilderness-alarm-plus repo is public on GitHub:
+###  1. Fork  https://github.com/runelite/plugin-hub
+###  2. Create a NEW file at: plugins/wilderness-alarm-plus
+###     (no extension; the filename must match the plugin's internal name)
+###  3. Paste the two lines below into it, replacing REPLACE_ME and the SHA
+###  4. Commit, push to your fork, open a PR to runelite/plugin-hub:master
+###
+### Get the commit SHA from:
+###   https://github.com/WuzeO/wilderness-alarm-plus/commits/master
+### (use the full 40-char SHA, not the short one)
+
+repository=https://github.com/WuzeO/wilderness-alarm-plus.git
+commit=0000000000000000000000000000000000000000
