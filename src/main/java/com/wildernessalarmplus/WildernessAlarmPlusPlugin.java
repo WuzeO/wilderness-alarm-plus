@@ -84,6 +84,10 @@ public class WildernessAlarmPlusPlugin extends Plugin
 			{
 				continue;
 			}
+			if (!isInWilderness(p.getWorldLocation()))
+			{
+				continue;
+			}
 			int cb = p.getCombatLevel();
 			if (cb >= low && cb <= high)
 			{
@@ -128,6 +132,11 @@ public class WildernessAlarmPlusPlugin extends Plugin
 			return true;
 		}
 		return false;
+	}
+
+	private static boolean isInWilderness(WorldPoint wp)
+	{
+		return computeWildernessLevel(wp) > 0;
 	}
 
 	private static int computeWildernessLevel(WorldPoint wp)

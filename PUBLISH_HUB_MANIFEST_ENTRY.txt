@@ -12,4 +12,4 @@
 ### (use the full 40-char SHA, not the short one)
 
 repository=https://github.com/WuzeO/wilderness-alarm-plus.git
-commit=0000000000000000000000000000000000000000
+commit=255c282b42b9594040d7a3c73b82526aac19c3af
